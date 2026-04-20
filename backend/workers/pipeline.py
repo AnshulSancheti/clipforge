@@ -31,10 +31,11 @@ def _update(db: Session, job: Job, **kwargs):
 def _get_local_video(job: Job) -> tuple[str, bool]:
     """
     Returns (local_path, is_tmp).
-    For R2 storage, downloads to a tmp file (caller must delete it).
+    For shared remote/database storage, downloads to a tmp file (caller must delete it).
     For local storage, returns the direct path.
     """
-    if settings.storage_type == "r2":
+    storage_type = (settings.storage_type or "local").lower()
+    if storage_type in {"db", "r2", "s3"}:
         suffix = os.path.splitext(job.video_path)[1] or ".mp4"
         tmp = tempfile.mktemp(suffix=suffix)
         storage.download_to_tmp(job.video_path, tmp)
@@ -97,7 +98,8 @@ def process_video(self, job_id: str):
         _update(db, job, step_label="Cutting & stitching clips…", progress=75)
 
         shorts_out    = []
-        use_shotstack = bool(settings.shotstack_api_key) and settings.storage_type in {"r2", "s3"}
+        storage_type = (settings.storage_type or "local").lower()
+        use_shotstack = bool(settings.shotstack_api_key) and storage_type in {"r2", "s3"}
 
         for i, design in enumerate(designs):
             short_id  = str(uuid.uuid4())[:8]
@@ -105,7 +107,7 @@ def process_video(self, job_id: str):
             dur       = design.get("duration_s", 60)
             enhanced  = False
 
-            if settings.storage_type == "local":
+            if storage_type == "local":
                 # ── Local: concat → burn overlays with FFmpeg ─────────────────
                 raw_path = storage.local_path(short_key)
                 ffmpeg_service.concat_segments(

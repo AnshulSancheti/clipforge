@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import mimetypes
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
@@ -7,14 +8,16 @@ import os
 from database import init_db
 from config import settings
 from routes import upload, jobs
+from services.storage import storage
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    os.makedirs(f"{settings.local_storage_path}/uploads", exist_ok=True)
-    os.makedirs(f"{settings.local_storage_path}/shorts", exist_ok=True)
-    os.makedirs(f"{settings.local_storage_path}/tmp", exist_ok=True)
+    if (settings.storage_type or "local").lower() == "local":
+        os.makedirs(f"{settings.local_storage_path}/uploads", exist_ok=True)
+        os.makedirs(f"{settings.local_storage_path}/shorts", exist_ok=True)
+        os.makedirs(f"{settings.local_storage_path}/tmp", exist_ok=True)
     yield
 
 
@@ -30,10 +33,30 @@ app.add_middleware(
 app.include_router(upload.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 
-# Serve local shorts/files in dev (in prod, R2 handles this)
-if settings.storage_type == "local":
+
+@app.get("/api/health")
+def health():
+    return {"ok": True}
+
+
+storage_type = (settings.storage_type or "local").lower()
+
+# Serve local shorts/files in dev.
+if storage_type == "local":
     app.mount(
         "/storage",
         StaticFiles(directory=settings.local_storage_path),
         name="storage",
     )
+
+
+if storage_type == "db":
+    @app.get("/storage/{key:path}")
+    def serve_database_storage(key: str):
+        try:
+            data = storage.read(key)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        media_type = mimetypes.guess_type(key)[0] or "application/octet-stream"
+        return Response(content=data, media_type=media_type)

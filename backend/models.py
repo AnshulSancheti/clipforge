@@ -1,7 +1,11 @@
 import uuid
-from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, Text, DateTime, JSON
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Integer, Float, Text, DateTime, JSON, LargeBinary
 from database import Base
+
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Job(Base):
@@ -34,8 +38,8 @@ class Job(Base):
 
     error = Column(Text, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
         return {
@@ -53,3 +57,12 @@ class Job(Base):
             "error": self.error,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class StorageObject(Base):
+    __tablename__ = "storage_objects"
+
+    key = Column(String, primary_key=True)
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

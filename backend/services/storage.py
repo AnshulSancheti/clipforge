@@ -1,7 +1,10 @@
 import os
+from urllib.parse import quote
 import aiofiles
 import boto3
 from config import settings
+from database import SessionLocal
+from models import StorageObject
 
 
 class LocalStorage:
@@ -33,6 +36,66 @@ class LocalStorage:
         path = os.path.join(self.base, key)
         if os.path.exists(path):
             os.remove(path)
+
+
+class DatabaseStorage:
+    def __init__(self, session_factory=SessionLocal):
+        self.session_factory = session_factory
+
+    async def save(self, key: str, data: bytes) -> str:
+        return self.save_sync(key, data)
+
+    def save_sync(self, key: str, data: bytes) -> str:
+        db = self.session_factory()
+        try:
+            obj = db.get(StorageObject, key)
+            if obj:
+                obj.data = data
+            else:
+                db.add(StorageObject(key=key, data=data))
+            db.commit()
+            return key
+        finally:
+            db.close()
+
+    def local_path(self, key: str) -> str:
+        raise RuntimeError("DatabaseStorage has no local_path. Use download_to_tmp().")
+
+    def download_to_tmp(self, key: str, tmp_path: str) -> str:
+        data = self.read(key)
+        directory = os.path.dirname(tmp_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(tmp_path, "wb") as f:
+            f.write(data)
+        return tmp_path
+
+    def upload_file(self, key: str, file_path: str) -> str:
+        with open(file_path, "rb") as f:
+            return self.save_sync(key, f.read())
+
+    def public_url(self, key: str) -> str:
+        return f"/storage/{quote(key, safe='/')}"
+
+    def read(self, key: str) -> bytes:
+        db = self.session_factory()
+        try:
+            obj = db.get(StorageObject, key)
+            if not obj:
+                raise FileNotFoundError(key)
+            return bytes(obj.data)
+        finally:
+            db.close()
+
+    def delete(self, key: str):
+        db = self.session_factory()
+        try:
+            obj = db.get(StorageObject, key)
+            if obj:
+                db.delete(obj)
+                db.commit()
+        finally:
+            db.close()
 
 
 class R2Storage:
@@ -123,9 +186,12 @@ class S3Storage:
 
 
 def _make_storage():
-    if settings.storage_type == "r2":
+    storage_type = (settings.storage_type or "local").lower()
+    if storage_type == "db":
+        return DatabaseStorage()
+    if storage_type == "r2":
         return R2Storage()
-    if settings.storage_type == "s3":
+    if storage_type == "s3":
         return S3Storage()
     return LocalStorage(settings.local_storage_path)
 

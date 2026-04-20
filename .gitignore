@@ -1,7 +1,9 @@
 .env
-storage/
+/storage/
 __pycache__/
 *.pyc
+*.tsbuildinfo
 .next/
 node_modules/
+.venv/
 localtunnel*.log

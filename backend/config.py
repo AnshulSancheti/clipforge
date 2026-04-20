@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     shotstack_env: str = "stage"   # "stage" or "v1" (production)
 
     # Storage
-    storage_type: str = "local"          # "local", "r2", or "s3"
+    storage_type: str = "local"          # "local", "db", "r2", or "s3"
     local_storage_path: str = "/app/storage"
 
     # Cloudflare R2
@@ -37,9 +37,7 @@ class Settings(BaseSettings):
     file_ttl_hours: int = 24
     max_shorts: int = 3
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

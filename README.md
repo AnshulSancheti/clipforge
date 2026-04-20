@@ -73,6 +73,49 @@ docker-compose up -d --build
 
 That's it. Traefik auto-issues SSL for your domain.
 
+## Deploy to Railway (free demo)
+
+Railway services do not share the `./storage` volume that Docker Compose uses locally.
+For the free school-project deployment, use Postgres-backed storage instead of `local`
+or R2:
+
+- `clipforge-backend` — root directory `backend`, Dockerfile `backend/Dockerfile`
+- `clipforge-worker` — same source as backend, with `SERVICE_TYPE=worker`
+- `clipforge-frontend` — root directory `frontend`, Dockerfile `frontend/Dockerfile`
+- `clipforge-db` — Railway Postgres
+- `Redis` — Railway Redis
+
+Set these variables on both backend and worker:
+
+```env
+STORAGE_TYPE=db
+DATABASE_URL=${{clipforge-db.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+ANTHROPIC_API_KEY=...
+ASSEMBLYAI_API_KEY=...
+SHOTSTACK_ENV=stage
+MAX_FILE_SIZE_MB=50
+MAX_SHORTS=3
+```
+
+Set this only on the worker:
+
+```env
+SERVICE_TYPE=worker
+CELERY_CONCURRENCY=1
+```
+
+Set these on the frontend:
+
+```env
+NEXT_PUBLIC_API_URL=/api
+INTERNAL_API_URL=http://${{clipforge-backend.RAILWAY_PRIVATE_DOMAIN}}:${{clipforge-backend.PORT}}
+```
+
+`NEXT_PUBLIC_API_URL=/api` keeps browser requests same-origin. The Next.js API and
+storage route handlers proxy to `INTERNAL_API_URL` at runtime, so the frontend does
+not need the public backend URL baked into the Docker image.
+
 ## Deploy to Render
 
 This repo is ready for Render deployment with production services for the frontend, backend, worker, database, and Redis.
