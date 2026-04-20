@@ -7,6 +7,7 @@ class Settings(BaseSettings):
 
     # Redis / Celery
     redis_url: str = "redis://redis:6379/0"
+    celery_concurrency: int = 1
 
     # API Keys
     anthropic_api_key: str = ""

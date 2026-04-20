@@ -18,4 +18,4 @@ RUN mkdir -p /app/storage/uploads /app/storage/shorts /app/storage/tmp
 EXPOSE 8000
 ENV PORT=8000
 
-CMD ["sh", "-lc", "if [ \"$SERVICE_TYPE\" = \"worker\" ]; then celery -A workers.pipeline.celery_app worker --loglevel=${CELERY_LOGLEVEL:-info} --concurrency=${CELERY_CONCURRENCY:-2}; else uvicorn main:app --host 0.0.0.0 --port ${PORT}; fi"]
+CMD ["sh", "-lc", "if [ \"$SERVICE_TYPE\" = \"worker\" ]; then celery -A workers.pipeline.celery_app worker --loglevel=${CELERY_LOGLEVEL:-info} --concurrency=${CELERY_CONCURRENCY:-1}; else uvicorn main:app --host 0.0.0.0 --port ${PORT}; fi"]

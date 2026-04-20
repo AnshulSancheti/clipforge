@@ -17,6 +17,7 @@ celery_app = Celery(
 )
 celery_app.conf.task_serializer = "json"
 celery_app.conf.result_serializer = "json"
+celery_app.conf.worker_concurrency = settings.celery_concurrency
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
