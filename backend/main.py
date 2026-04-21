@@ -7,7 +7,7 @@ import os
 
 from database import init_db
 from config import settings
-from routes import upload, jobs
+from routes import upload, jobs, cleanup
 from services.storage import storage
 
 
@@ -32,6 +32,7 @@ app.add_middleware(
 
 app.include_router(upload.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(cleanup.router, prefix="/api")
 
 
 @app.get("/api/health")
