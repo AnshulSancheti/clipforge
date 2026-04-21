@@ -30,7 +30,8 @@ export async function proxyToBackend(
     };
 
     if (request.method !== "GET" && request.method !== "HEAD") {
-      init.body = await request.arrayBuffer();
+      init.body = request.body;
+      (init as RequestInit & { duplex: string }).duplex = "half";
     }
 
     const response = await fetch(targetUrl, init);

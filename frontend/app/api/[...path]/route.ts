@@ -3,6 +3,7 @@ import { proxyToBackend } from "@/lib/runtimeProxy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 type RouteContext = {
   params: Promise<{
