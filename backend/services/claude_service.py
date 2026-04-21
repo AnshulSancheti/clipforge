@@ -10,6 +10,13 @@ MODEL = "claude-sonnet-4-20250514"
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 LINKEDIN_SKILL = (PROMPTS_DIR / "sst_linkedin_skill.md").read_text(encoding="utf-8")
 
+
+class ShortsDesignError(RuntimeError):
+    pass
+
+
+MIN_SHORT_DURATION_MS = 25_000
+
 # ── Scaler brand context injected into every prompt ──────────────────────────
 SCALER_CONTEXT = """
 BRAND CONTEXT:
@@ -273,6 +280,11 @@ def design_shorts(transcript: list[dict], max_shorts: int = 3) -> list[dict]:
     if not transcript:
         return []
 
+    transcript_start_ms = min(int(s["start_ms"]) for s in transcript)
+    transcript_end_ms = max(int(s["end_ms"]) for s in transcript)
+    if transcript_end_ms - transcript_start_ms < MIN_SHORT_DURATION_MS:
+        return []
+
     # Build timestamped transcript — format: [MM:SS] sentence
     lines = []
     for s in transcript:
@@ -342,7 +354,11 @@ Return a JSON array of exactly {max_shorts} objects. No markdown, just the array
             d["segments"] = clean_segs
             d["duration_s"] = total_ms / 1000
             valid.append(d)
+        if not valid:
+            raise ShortsDesignError("Shorts design failed: provider returned no valid shorts designs")
         return valid
+    except ShortsDesignError:
+        raise
     except Exception as exc:
         print(f"[claude] design_shorts failed: {exc}")
-        return []
+        raise ShortsDesignError(f"Shorts design failed: {exc}") from exc

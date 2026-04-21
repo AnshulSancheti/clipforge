@@ -98,6 +98,12 @@ MAX_FILE_SIZE_MB=50
 MAX_SHORTS=3
 ```
 
+Set this only on the backend:
+
+```env
+PORT=8000
+```
+
 Set this only on the worker:
 
 ```env
@@ -115,6 +121,19 @@ INTERNAL_API_URL=http://${{clipforge-backend.RAILWAY_PRIVATE_DOMAIN}}:${{clipfor
 `NEXT_PUBLIC_API_URL=/api` keeps browser requests same-origin. The Next.js API and
 storage route handlers proxy to `INTERNAL_API_URL` at runtime, so the frontend does
 not need the public backend URL baked into the Docker image.
+
+Railway troubleshooting:
+
+- Job stuck at `queued`: the worker is not running, or backend and worker do not
+  share the same `REDIS_URL`.
+- Job fails before `cutting`: check the job error and backend/worker logs for
+  missing `ASSEMBLYAI_API_KEY`, `ANTHROPIC_API_KEY`, or storage misconfiguration.
+- Job completes with no shorts: redeploy this version and inspect the job error.
+  Shorts design provider failures are surfaced as processing errors instead of
+  being hidden as an empty shorts list.
+- Shorts exist but videos do not play: ensure backend and worker both use
+  `STORAGE_TYPE=db`, and the frontend has `NEXT_PUBLIC_API_URL=/api` plus
+  `INTERNAL_API_URL` pointing at the backend private domain.
 
 ## Deploy to Render
 
