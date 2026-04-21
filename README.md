@@ -17,7 +17,9 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 Required keys in `.env`:
 
-- `ANTHROPIC_API_KEY` — Claude Haiku
+- `AI_PROVIDER` — `anthropic` or `openai`
+- `ANTHROPIC_API_KEY` — required when `AI_PROVIDER=anthropic`
+- `OPENAI_API_KEY` — required when `AI_PROVIDER=openai`
 - `ASSEMBLYAI_API_KEY` — transcription (free tier: 100 hours)
 - `POSTGRES_PASSWORD` — any string (local only)
 
@@ -28,7 +30,7 @@ Use the built-in Cloudflare Quick Tunnel flow if you just need a temporary publi
 Prerequisites:
 
 - Docker Desktop is running
-- `.env` contains `ANTHROPIC_API_KEY`
+- `.env` contains either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, based on `AI_PROVIDER`
 - `.env` contains `ASSEMBLYAI_API_KEY`
 
 Start the demo:
@@ -91,12 +93,17 @@ Set these variables on both backend and worker:
 STORAGE_TYPE=db
 DATABASE_URL=${{clipforge-db.DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
-ANTHROPIC_API_KEY=...
+AI_PROVIDER=openai
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.4-mini
 ASSEMBLYAI_API_KEY=...
 SHOTSTACK_ENV=stage
 MAX_FILE_SIZE_MB=50
 MAX_SHORTS=3
 ```
+
+To keep using Anthropic instead, set `AI_PROVIDER=anthropic` and
+`ANTHROPIC_API_KEY=...` on both backend and worker.
 
 Set this only on the backend:
 
@@ -127,7 +134,8 @@ Railway troubleshooting:
 - Job stuck at `queued`: the worker is not running, or backend and worker do not
   share the same `REDIS_URL`.
 - Job fails before `cutting`: check the job error and backend/worker logs for
-  missing `ASSEMBLYAI_API_KEY`, `ANTHROPIC_API_KEY`, or storage misconfiguration.
+  missing `ASSEMBLYAI_API_KEY`, `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`, or storage
+  misconfiguration.
 - Job completes with no shorts: redeploy this version and inspect the job error.
   Shorts design provider failures are surfaced as processing errors instead of
   being hidden as an empty shorts list.
@@ -150,6 +158,7 @@ Use the `render.yaml` blueprint in this repo to deploy:
 During deployment, set these secret environment variables in Render:
 
 - `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY` if `AI_PROVIDER=openai`
 - `ASSEMBLYAI_API_KEY`
 - `SHOTSTACK_API_KEY`
 - `R2_ACCOUNT_ID`
@@ -197,7 +206,7 @@ AWS_S3_PUBLIC_URL=https://video-pipeline.s3.amazonaws.com
 ## Pipeline
 
 ```
-Upload → Transcribe (AssemblyAI) → Generate posts (Claude Haiku) → Score + cut shorts (FFmpeg)
+Upload → Transcribe (AssemblyAI) → Generate posts (configured AI provider) → Score + cut shorts (FFmpeg)
 ```
 
 Each step runs in a Celery worker. The frontend polls `/api/jobs/{id}` every 2.5s for status.

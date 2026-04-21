@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 import re
 import anthropic
+import httpx
 from config import settings
 
-client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-MODEL = "claude-sonnet-4-20250514"
+ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
+OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 LINKEDIN_SKILL = (PROMPTS_DIR / "sst_linkedin_skill.md").read_text(encoding="utf-8")
 
@@ -16,6 +17,8 @@ class ShortsDesignError(RuntimeError):
 
 
 MIN_SHORT_DURATION_MS = 25_000
+
+client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
 # ── Scaler brand context injected into every prompt ──────────────────────────
 SCALER_CONTEXT = """
@@ -46,10 +49,25 @@ def _chat(
     max_tokens: int = 4096,
     *,
     system: str | None = None,
-    model: str = MODEL,
+    model: str | None = None,
+) -> str:
+    provider = (settings.ai_provider or "anthropic").lower()
+    if provider == "openai":
+        return _chat_openai(prompt, max_tokens=max_tokens, system=system, model=model)
+    if provider != "anthropic":
+        raise ValueError(f"Unsupported AI_PROVIDER: {settings.ai_provider}")
+    return _chat_anthropic(prompt, max_tokens=max_tokens, system=system, model=model)
+
+
+def _chat_anthropic(
+    prompt: str,
+    max_tokens: int = 4096,
+    *,
+    system: str | None = None,
+    model: str | None = None,
 ) -> str:
     kwargs = {
-        "model": model,
+        "model": model or ANTHROPIC_MODEL,
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
@@ -57,6 +75,50 @@ def _chat(
         kwargs["system"] = system
     msg = client.messages.create(**kwargs)
     return msg.content[0].text
+
+
+def _chat_openai(
+    prompt: str,
+    max_tokens: int = 4096,
+    *,
+    system: str | None = None,
+    model: str | None = None,
+) -> str:
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is required when AI_PROVIDER=openai")
+
+    payload = {
+        "model": model or settings.openai_model,
+        "input": prompt,
+        "max_output_tokens": max_tokens,
+    }
+    if system:
+        payload["instructions"] = system
+
+    response = httpx.post(
+        OPENAI_RESPONSES_URL,
+        headers={
+            "Authorization": f"Bearer {settings.openai_api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=180,
+    )
+    response.raise_for_status()
+    return _extract_openai_text(response.json())
+
+
+def _extract_openai_text(data: dict) -> str:
+    output_text = data.get("output_text")
+    if output_text:
+        return output_text
+
+    for item in data.get("output", []):
+        for content in item.get("content", []):
+            if content.get("type") == "output_text" and content.get("text"):
+                return content["text"]
+
+    raise RuntimeError("OpenAI response did not include text output")
 
 
 def _clean_json_text(text: str) -> str:

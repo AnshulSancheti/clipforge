@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     celery_concurrency: int = 1
 
+    # AI provider
+    ai_provider: str = "anthropic"       # "anthropic" or "openai"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5.4-mini"
+
     # API Keys
     anthropic_api_key: str = ""
     assemblyai_api_key: str = ""
